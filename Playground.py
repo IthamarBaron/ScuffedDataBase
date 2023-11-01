@@ -1,10 +1,7 @@
 # this file is used as a testing area
+from DataBase import Database
+
 import pickle
-
-d = {"key":"value","1key":"1value"}
-print(d)
-del d["key"]
-print(d)
-
-
+with open("database.pkl",'rb') as f:
+    print(pickle.load(f))
 

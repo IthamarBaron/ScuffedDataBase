@@ -8,42 +8,44 @@ class Database:
         self.lock = threading.Lock()
 
     def save_data_to_file(self):
-        with open(self.file_path, 'wb') as database_file:
-            pickle.dump(self.data_dict, database_file)
-        pass
+        # saves the data_dict to the datbase
+        try:
+            with open(self.file_path, 'wb') as database_file:
+                pickle.dump(self.data_dict, database_file)
+        except:
+            pass
 
     def load_data_from_file(self):
-        with open(self.file_path, 'rb') as database_file:
-            self.data_dict = pickle.load(database_file)
-        pass
+        # loads the data_dict to the database
+        try:
+            with open(self.file_path, 'rb') as database_file:
+                self.data_dict = pickle.load(database_file)
+        except:
+            pass
 
     def set_value(self, key, value):
-        # Implement the logic for setting a value in the database
+        # the logic for setting a value in the database
         try:
             self.load_data_from_file()
-            if key in self.data_dict.keys():
-                self.data_dict[key] = value
-                return f"Changed value in {key} to {value}."
-            else:
-                self.data_dict.update({key: value})
-                return f"Added new pair Key:{key} Value:{value}."
+            self.data_dict[key] = value
             self.save_data_to_file()
-        except:
-            return "Something went wrong..."
+            return f"Set value in {key} to {value}."
+        except Exception as e:
+            return f"Something went wrong setting a value... [{e}]"
 
     def get_value(self, key):
-        # Implement the logic for getting a value from the database
+        # the logic for getting a value from the database
         try:
             self.load_data_from_file()
             if key in self.data_dict.keys():
                 return self.data_dict[key]
             else:
                 return None
-        except:
-            return f"Something went wrong getting a value"
+        except Exception as e:
+            return f"Something went wrong getting a value... [{e}]"
 
     def delete_value(self, key):
-        # Implement the logic for deleting a value from the database
+        # the logic for deleting a value from the database
         try:
             self.load_data_from_file()
             del self.data_dict[key]
