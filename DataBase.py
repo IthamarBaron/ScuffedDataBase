@@ -21,4 +21,8 @@ class Database(HandleDict):
         except:
             pass
 
+    def clear_database(self):
+        self.data_dict = {}
+        self.save_data_to_file()
+
 

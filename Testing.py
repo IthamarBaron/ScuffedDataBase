@@ -1,6 +1,10 @@
+import pickle
+
 from DataBase import Database
 import multiprocessing
 import threading
+import time
+
 
 class DatabaseTester:
     def __init__(self, database, test_with_threads=True):
@@ -12,21 +16,28 @@ class DatabaseTester:
             self.lock = multiprocessing.Lock()
 
     def read_data(self, key):
+        value = None
         with self.lock:
-            self.database.load_data_from_file()
-            value = self.database.get_value(key)
-            return value
+            try:
+                self.database.load_data_from_file()
+                value = self.database.get_value(key)
+
+            except Exception as e:
+                print(f"Read error: {e}")
+        return value
 
     def write_data(self, key, value):
         with self.lock:
-            self.database.load_data_from_file()
-            self.database.set_value(key, value)
-            self.database.save_data_to_file()
-        return f"wrote to {key} -> {value}"
+            try:
+                self.database.load_data_from_file()
+                self.database.set_value(key, value)
+                self.database.save_data_to_file()
+            except Exception as e:
+                print(f"Write error: {e}")
 
     def run_tests(self):
         def test_write_no_competition():
-            # Test writing to the database without competition
+            self.database.clear_database() # clearing the database for this test
             key = "test_key"
             value = "test_value"
             self.write_data(key, value)
@@ -37,7 +48,7 @@ class DatabaseTester:
                 print("Write no competition test failed.")
 
         def test_read_no_competition():
-            # Test reading from the database without competition
+            self.database.clear_database() # clearing the database for this test
             key = "test_key"
             value = "test_value"
             self.write_data(key, value)
@@ -48,49 +59,61 @@ class DatabaseTester:
                 print("Read no competition test failed.")
 
         def test_write_concurrent():
-            # Test concurrent writing by two processes/threads
+            self.database.clear_database() # clearing the database for this test
             key = "test_key"
             value1 = "value1"
             value2 = "value2"
-            lock = multiprocessing.Lock() if not self.test_with_threads else threading.Lock()
-            with lock:
-                result1 = self.write_data(key, value1)
-            # Sleep for a moment to allow the second process/thread to attempt to write
-            import time
-            time.sleep(1)
-            with lock:
-                result2 = self.write_data(key, value2)
-            if result1 == "wrote to test_key -> value1" and result2 == "wrote to test_key -> value2":
+
+            # Attempt concurrent writes
+            process1 = multiprocessing.Process(target=self.write_data, args=(key, value1))
+            process2 = multiprocessing.Process(target=self.write_data, args=(key, value2))
+
+            process1.start()
+            process2.start()
+
+            process1.join()
+            process2.join()
+
+            # Check if one of the writes failed
+            read_value = self.read_data(key)
+            if read_value in (value1, value2):
                 print("Write concurrent test passed.")
             else:
                 print("Write concurrent test failed.")
 
         def test_read_concurrent():
-            # Test concurrent reading by two processes/threads
+            self.database.clear_database() # clearing the database for this test
             key = "test_key"
             value = "test_value"
-            self.write_data(key, value)
-            lock = multiprocessing.Lock() if not self.test_with_threads else threading.Lock()
-            with lock:
-                result1 = self.read_data(key)
-            # Sleep for a moment to allow the second process/thread to attempt to read
-            import time
-            time.sleep(1)
-            with lock:
-                result2 = self.read_data(key)
-            if result1 == value and result2 == value:
+            tester.write_data(key, value) # writing this value to run the test on
+
+            # Attempt concurrent reads
+            process1 = multiprocessing.Process(target=self.read_data, args=(key,))
+            process2 = multiprocessing.Process(target=self.read_data, args=(key,))
+
+            process1.start()
+            process2.start()
+
+            process1.join()
+            process2.join()
+
+            # Check if one of the reads failed
+            if self.read_data(key) == value:
                 print("Read concurrent test passed.")
             else:
                 print("Read concurrent test failed.")
 
+
         test_write_no_competition()
         test_read_no_competition()
-        test_write_concurrent()
         test_read_concurrent()
+        test_write_concurrent()
+
 
 
 if __name__ == "__main__":
-    database = Database(Database("database_file.pickle"))
-    tester = DatabaseTester(database, test_with_threads=True)
+    database = Database("database_file.pickle")
+    tester = DatabaseTester(database, test_with_threads=False)
     tester.run_tests()
+
 
