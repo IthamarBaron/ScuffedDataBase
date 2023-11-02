@@ -6,7 +6,7 @@ class Database(HandleDict):
         self.file_path = file_path
 
     def save_data_to_file(self):
-        # saves the data_dict to the datbase
+        # saves the data_dict to the database
         try:
             with open(self.file_path, 'wb') as database_file:
                 pickle.dump(self.data_dict, database_file)
