@@ -35,85 +35,157 @@ class DatabaseTester:
             except Exception as e:
                 print(f"Write error: {e}")
 
+
     def run_tests(self):
         def test_write_no_competition():
-            self.database.clear_database() # clearing the database for this test
+            self.database.clear_database()
             key = "test_key"
             value = "test_value"
-            self.write_data(key, value)
-            read_value = self.read_data(key)
-            if read_value == value:
-                print("Write no competition test passed.")
+            if self.test_with_threads:
+                # Thread path
+                def thread_write_data():
+                    self.write_data(key, value)
+
+                thread = threading.Thread(target=thread_write_data)
+                thread.start()
+                thread.join()
+
+                read_value = self.read_data(key)
+                if read_value == value:
+                    print("Write no competition test passed (1).")
+                else:
+                    print("Write no competition test failed (1).")
             else:
-                print("Write no competition test failed.")
+                # Process path
+                self.write_data(key, value)
+                read_value = self.read_data(key)
+                if read_value == value:
+                    print("Write no competition test passed (1).")
+                else:
+                    print("Write no competition test failed (1).")
 
         def test_read_no_competition():
-            self.database.clear_database() # clearing the database for this test
+            self.database.clear_database()
             key = "test_key"
             value = "test_value"
-            self.write_data(key, value)
-            read_value = self.read_data(key)
-            if read_value == value:
-                print("Read no competition test passed.")
+            if self.test_with_threads:
+                # Thread path
+                def thread_read_data():
+                    read_value = self.read_data(key)
+                    if read_value == value:
+                        print("Read no competition test passed (2).")
+                    else:
+                        print("Read no competition test failed (2).")
+
+                self.write_data(key, value)
+                thread = threading.Thread(target=thread_read_data)
+                thread.start()
+                thread.join()
             else:
-                print("Read no competition test failed.")
+                # Process path
+                self.write_data(key, value)
+                read_value = self.read_data(key)
+                if read_value == value:
+                    print("Read no competition test passed (2).")
+                else:
+                    print("Read no competition test failed (2).")
 
         def test_write_concurrent():
-            self.database.clear_database() # clearing the database for this test
+            self.database.clear_database()
             key = "test_key"
             value1 = "value1"
             value2 = "value2"
+            if self.test_with_threads:
+                # Thread path
+                def thread_write_data(value):
+                    self.write_data(key, value)
 
-            # Attempt concurrent writes
-            process1 = multiprocessing.Process(target=self.write_data, args=(key, value1))
-            process2 = multiprocessing.Process(target=self.write_data, args=(key, value2))
+                thread1 = threading.Thread(target=thread_write_data, args=(value1,))
+                thread2 = threading.Thread(target=thread_write_data, args=(value2,))
+                thread1.start()
+                thread2.start()
+                thread1.join()
+                thread2.join()
 
-            process1.start()
-            process2.start()
-
-            process1.join()
-            process2.join()
-
-            # Check if one of the writes failed
-            read_value = self.read_data(key)
-            if read_value in (value1, value2):
-                print("Write concurrent test passed.")
+                read_value = self.read_data(key)
+                if read_value in (value1, value2):
+                    print("Write concurrent test passed (3).")
+                else:
+                    print("Write concurrent test failed (3).")
             else:
-                print("Write concurrent test failed.")
+                # Process path
+                self.write_data(key, value1)
+                self.write_data(key, value2)
 
-        def test_read_concurrent():
-            self.database.clear_database() # clearing the database for this test
+                read_value = self.read_data(key)
+                if read_value in (value1, value2):
+                    print("Multiple writers test passed (3).")
+                else:
+                    print("Multiple writers test passed (3).")
+
+        def test_multiple_readers():
+            self.database.clear_database()
             key = "test_key"
             value = "test_value"
-            tester.write_data(key, value) # writing this value to run the test on
+            if self.test_with_threads:
+                # Thread path
+                num_readers = 3
+                results = []
 
-            # Attempt concurrent reads
-            process1 = multiprocessing.Process(target=self.read_data, args=(key,))
-            process2 = multiprocessing.Process(target=self.read_data, args=(key,))
+                def thread_read_data():
+                    read_value = self.read_data(key)
+                    results.append(read_value)
 
-            process1.start()
-            process2.start()
+                self.write_data(key, value)
 
-            process1.join()
-            process2.join()
+                threads = []
+                for _ in range(num_readers):
+                    thread = threading.Thread(target=thread_read_data)
+                    threads.append(thread)
+                    thread.start()
 
-            # Check if one of the reads failed
-            if self.read_data(key) == value:
-                print("Read concurrent test passed.")
+                for thread in threads:
+                    thread.join()
+
+                if all(result == value for result in results):
+                    print("Multiple readers test passed (4).")
+                else:
+                    print("Multiple readers test failed (4).")
             else:
-                print("Read concurrent test failed.")
+                # Process path
+                num_readers = 3
+                results = []
 
+                def process_read_data():
+                    read_value = self.read_data(key)
+                    results.append(read_value)
+
+                self.write_data(key, value)
+
+                processes = []
+                for _ in range(num_readers):
+                    process = multiprocessing.Process(target=self.read_data, args=(key,))
+                    processes.append(process)
+                    process.start()
+
+                for process in processes:
+                    process.join()
+
+                if all(result == value for result in results):
+                    print("Multiple readers test passed (4).")
+                else:
+                    print("Multiple readers test failed (4).")
 
         test_write_no_competition()
         test_read_no_competition()
-        test_read_concurrent()
         test_write_concurrent()
+        test_multiple_readers()
 
 
 
 if __name__ == "__main__":
     database = Database("database_file.pickle")
-    tester = DatabaseTester(database, test_with_threads=False)
+    tester = DatabaseTester(database, test_with_threads=True)
     tester.run_tests()
 
 
