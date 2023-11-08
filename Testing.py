@@ -43,10 +43,7 @@ class DatabaseTester:
             value = "test_value"
             if self.test_with_threads:
                 # Thread path
-                def thread_write_data():
-                    self.write_data(key, value)
-
-                thread = threading.Thread(target=thread_write_data)
+                thread = threading.Thread(target=self.write_data,args=(key,value,))
                 thread.start()
                 thread.join()
 
@@ -68,6 +65,7 @@ class DatabaseTester:
             self.database.clear_database()
             key = "test_key"
             value = "test_value"
+            self.write_data(key,value)
             if self.test_with_threads:
                 # Thread path
                 def thread_read_data():
@@ -114,14 +112,21 @@ class DatabaseTester:
                     print("Write concurrent test failed (3).")
             else:
                 # Process path
-                self.write_data(key, value1)
-                self.write_data(key, value2)
+                process1 = multiprocessing.Process(target=self.write_data, args=(key, value1))
+                process2 = multiprocessing.Process(target=self.write_data, args=(key, value2))
 
+                process1.start()
+                process2.start()
+
+                process1.join()
+                process2.join()
+
+                # Check if one of the writes failed
                 read_value = self.read_data(key)
                 if read_value in (value1, value2):
-                    print("Multiple writers test passed (3).")
+                    print("Write concurrent test passed (3).")
                 else:
-                    print("Multiple writers test passed (3).")
+                    print("Write concurrent test failed (3).")
 
         def test_multiple_readers():
             self.database.clear_database()
@@ -185,7 +190,7 @@ class DatabaseTester:
 
 if __name__ == "__main__":
     database = Database("database_file.pickle")
-    tester = DatabaseTester(database, test_with_threads=True)
+    tester = DatabaseTester(database, test_with_threads=False)
     tester.run_tests()
 
 
