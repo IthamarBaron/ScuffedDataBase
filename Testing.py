@@ -35,7 +35,6 @@ class DatabaseTester:
             except Exception as e:
                 print(f"Write error: {e}")
 
-
     def run_tests(self):
         def test_write_no_competition():
             self.database.clear_database()
@@ -181,16 +180,73 @@ class DatabaseTester:
                 else:
                     print("Multiple readers test failed (4).")
 
+        def test_both_read_and_write_concurrent():
+            self.database.clear_database()
+            key1, value1 = "t1", "t1wrote here"
+            key2, value2 = "t2", "t2wrote here"
+
+            if self.test_with_threads:
+                results = []
+
+                def thread_read_data(key):
+                    results.append(self.read_data(key))
+
+                # Thread path
+                thread1 = threading.Thread(target=self.write_data, args=(key1, value1,))
+                thread2 = threading.Thread(target=self.write_data, args=(key2, value2,))
+                thread3 = threading.Thread(target=thread_read_data, args=(key1,))
+                thread4 = threading.Thread(target=thread_read_data, args=(key2,))
+
+                thread1.start()
+                thread2.start()
+                thread3.start()
+                thread4.start()
+                thread1.join()
+                thread2.join()
+                thread3.join()
+                thread4.join()
+
+                if results[0] == value1 and results[1] == value2:
+                    print("Both read and write concurrent test passed (5).")
+                else:
+                    print("Both read and write concurrent test failed (5).")
+            else:
+                # Process path
+                results = []
+                def process_read_data(key):
+                    results.append(self.read_data(key))
+
+                process1 = multiprocessing.Process(target=self.write_data, args=(key1, value1,))
+                process2 = multiprocessing.Process(target=self.write_data, args=(key2, value2,))
+                process3 = multiprocessing.Process(target=process_read_data, args=(key1,))
+                process4 = multiprocessing.Process(target=process_read_data, args=(key2,))
+
+                process1.start()
+                process2.start()
+                process3.start()
+                process4.start()
+                process1.join()
+                process2.join()
+                process3.join()
+                process4.join()
+
+                if results[0] == value1 and results[1] == value2:
+                    print("Both read and write concurrent test passed (5).")
+                else:
+                    print("Both read and write concurrent test failed (5).")
+
+        print(f"Testing with Threads [{self.test_with_threads}]")
         test_write_no_competition()
         test_read_no_competition()
         test_write_concurrent()
         test_multiple_readers()
-
+        test_both_read_and_write_concurrent()
 
 
 if __name__ == "__main__":
     database = Database("database_file.pickle")
     tester = DatabaseTester(database, test_with_threads=False)
     tester.run_tests()
+
 
 
