@@ -1,35 +1,33 @@
-# this file is used as a testing area
-from LocalDict import HandleDict
-from DataBase import Database
+import multiprocessing
 
-# Instantiate a Database object with a file path
-db = Database("database_file.pickle")
+# Create shared memory for data and a counter
+data_memory = multiprocessing.Array('c', b'\x00' * 100)
+counter_memory = multiprocessing.Value('i', 0)
+print("a")
+def test(key):
+    # Read the current counter value and update it
+    with counter_memory.get_lock():
+        counter = counter_memory.value
+        counter_memory.value += 1
 
-# Test the set_value method
-db.set_value("key1", "value1")
-print(db.get_value("key1"))  # Should print "value1"
+    # Calculate the start position for the new data
+    start_position = counter * len(key)
+    # Write the key to the shared memory
+    data_memory[start_position:start_position + len(key)] = key.encode('utf-8')
+    data = bytearray(data_memory[:]).decode('utf-8').rstrip('\x00')
+    print("1Data in shared memory:", repr(data))  # Print the repr to see non-printable characters
+if __name__ == "__main__":
+    # Start two processes with the test function and different arguments
+    p1 = multiprocessing.Process(target=test, args=("one",))
+    p2 = multiprocessing.Process(target=test, args=("two",))
 
-# Test the save and load methods
-db.save_data_to_file()
-db.load_data_from_file()
+    p1.start()
+    p2.start()
 
-# Test the get_value method again after loading from the file
-print(db.get_value("key1"))  # Should still print "value1"
+    p1.join()
+    p2.join()
 
-# Test the delete_value method
-db.delete_value("key1")
-print(db.get_value("key1"))  # Should print None (key1 is deleted)
+    # Read the data from the shared memory
+    data = bytearray(data_memory[:]).decode('utf-8').rstrip('\x00')
 
-# Test saving and loading after deleting
-db.save_data_to_file()
-db.load_data_from_file()
-print(db.get_value("key1"))  # Should still print None
-
-# Test a new key-value pair
-db.set_value("key2", "value2")
-db.save_data_to_file()
-db.load_data_from_file()
-print(db.get_value("key2"))  # Should print "value2"
-
-# Additional tests can be added as needed
-
+    print("2Data in shared memory:", repr(data))  # Print the repr to see non-printable characters

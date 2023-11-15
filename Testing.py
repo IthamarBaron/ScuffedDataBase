@@ -134,7 +134,7 @@ class DatabaseTester:
             else:
                 print("Write concurrent test failed (3).")
 
-    def test_multiple_readers(self): # PROCESS PATH IS NOT WORKING IDK WHY
+    def test_multiple_readers(self): # PROCCES PATH IS NOT WORKING IDK WHY
         self.database.clear_database()
         key = "test_key"
         value = "test_value"
