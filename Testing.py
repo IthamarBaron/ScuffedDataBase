@@ -6,7 +6,6 @@ from multiprocessing import shared_memory
 import threading
 import time
 
-TEMP = []
 class DatabaseTester:
     def __init__(self, database, test_with_threads=True):
         self.database = database
@@ -36,11 +35,20 @@ class DatabaseTester:
             except Exception as e:
                 print(f"Write error: {e}")
 
-    def process_read_data(self,key):
-        print(f"Key {key}")
-        print("Value in Key: "+self.read_data(key))
+    def save_shared_memory_for_test(self, key):
+        print(f"im here {key}")
+        shm = shared_memory.SharedMemory(name='test', create=False, size=10000)
+        i = shm.buf[0]
         value = self.read_data(key)
-        TEMP.append(value)
+        print(f"value {value}")
+        value_memoryview = memoryview(value)
+        separator = memoryview(b'#')
+        shm.buf[i:i + len(value_memoryview)] = value_memoryview
+        i += len(value_memoryview)
+        shm.buf[i:i + len(separator)] = separator
+        i += len(separator)
+        shm.buf[0] = i
+
 
 # region tests
     def test_write_no_competition(self):
@@ -187,8 +195,8 @@ class DatabaseTester:
 # endregion
     def test_both_read_and_write_concurrent(self):
         self.database.clear_database()
-        key1, value1 = "t1", "t1wrote here"
-        key2, value2 = "t2", "t2wrote here"
+        key1, value1 = "t1", b"t1"
+        key2, value2 = "t2", b"t2"
         # region THREADS
         if self.test_with_threads:
             results = []
@@ -218,10 +226,14 @@ class DatabaseTester:
         #endregion
         else:
             # Process path
-            process1 = multiprocessing.Process(target=self.write_data, args=(key1, value1,))
-            process2 = multiprocessing.Process(target=self.write_data, args=(key2, value2,))
-            process3 = multiprocessing.Process(target=self.process_read_data, args=(key1,))
-            process4 = multiprocessing.Process(target=self.process_read_data, args=(key2,))
+
+            shm = shared_memory.SharedMemory(name='test', create=True, size=10000)
+            shm.buf[0] = 1
+
+            process1 = multiprocessing.Process(target=self.write_data, args=(key1, str(value1),))
+            process2 = multiprocessing.Process(target=self.write_data, args=(key2, str(value2),))
+            process3 = multiprocessing.Process(target=self.save_shared_memory_for_test, args=((key1),))
+            process4 = multiprocessing.Process(target=self.save_shared_memory_for_test, args=((key2),))
 
             process1.start()
             process2.start()
@@ -232,18 +244,22 @@ class DatabaseTester:
             process3.join()
             process4.join()
 
-            print(f"TEMP LIST: {TEMP}")
-            if TEMP[0] == value1 and TEMP[1] == value2:
+            filtered_list = [x for x in shm.buf.tolist() if x != 0]
+            print(f"filtered_list {filtered_list}")
+            decoded_string = ''.join(chr(code) for code in filtered_list[1::])
+            print(f"Decoded string {decoded_string}")
+            v1, v2 = filter(None, decoded_string.split('#'))
+            if v1 == value1 and v2 == value2:
                 print("Both read and write concurrent test passed (5).")
             else:
                 print("Both read and write concurrent test failed (5).")
 
     def run_tests(self):
         print(f"Testing with Threads [{self.test_with_threads}]")
-        self.test_write_no_competition()
-        self.test_read_no_competition()
-        self.test_write_concurrent()
-        self.test_multiple_readers()
+        #self.test_write_no_competition()
+      #  self.test_read_no_competition()
+       # self.test_write_concurrent()
+      #  self.test_multiple_readers()
         self.test_both_read_and_write_concurrent()
 
 

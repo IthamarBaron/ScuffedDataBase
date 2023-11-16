@@ -4,25 +4,30 @@ import  time
 
 
 def save_memory(value):
-    shm = shared_memory.SharedMemory(name='test', create=False, size=4)
-    print(f"in shared memory a: {type(value)}")
+    shm = shared_memory.SharedMemory(name='test', create=False, size=100)
     i = shm.buf[0]
-    # Convert bytes to memoryview before assignment
     value_memoryview = memoryview(value)
-    shm.buf[i:(i + len(value_memoryview))] = value_memoryview
-    print(f"Starting at [{i} : {i+len(value_memoryview)}] list is: {shm.buf.tolist()}")
-    shm.buf[0] = i + len(value_memoryview)
+    separator = memoryview(b'#')
+    shm.buf[i:i + len(value_memoryview)] = value_memoryview
+    i += len(value_memoryview)
+    shm.buf[i:i + len(separator)] = separator
+    i += len(separator)
+    shm.buf[0] = i
 
 if __name__ == '__main__':
     print("created shared memory")
-    shm = shared_memory.SharedMemory(name='test', create=True, size=4)
+    shm = shared_memory.SharedMemory(name='test', create=True, size=100)
     shm.buf[0] = 1
-    p = multiprocessing.Process(target=save_memory, args=(b"a",))
-    p2 = multiprocessing.Process(target=save_memory, args=(b"b",))
+    p = multiprocessing.Process(target=save_memory, args=(b"ONE",))
+    p2 = multiprocessing.Process(target=save_memory, args=(b"TWO",))
 
     p.start()
     p2.start()
     p.join()
     p2.join()
-    print(shm.buf.tolist())
+    filtered_list = [x for x in shm.buf.tolist() if x != 0]
+    decoded_string = ''.join(chr(code) for code in filtered_list[1::])
+
+    print(filtered_list)
+    print(decoded_string)
 
