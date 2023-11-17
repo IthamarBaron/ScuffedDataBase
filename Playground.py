@@ -1,7 +1,5 @@
 import multiprocessing
 from multiprocessing import shared_memory
-import  time
-
 
 def save_memory(value):
     shm = shared_memory.SharedMemory(name='test', create=False, size=100)
