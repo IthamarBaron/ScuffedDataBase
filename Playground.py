@@ -26,6 +26,7 @@ if __name__ == '__main__':
     filtered_list = [x for x in shm.buf.tolist() if x != 0]
     decoded_string = ''.join(chr(code) for code in filtered_list[1::])
 
+    print("test")
     print(filtered_list)
     print(decoded_string)
 
