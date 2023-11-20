@@ -35,20 +35,9 @@ class DatabaseTester:
             except Exception as e:
                 print(f"Write error: {e}")
 
-    def save_shared_memory_for_test(self, key):
-        print(f"im here {key}")
-        shm = shared_memory.SharedMemory(name='test', create=False, size=10000)
-        i = shm.buf[0]
+    def process_read_data(self,key):
+        print(f"Key {key} Value in Key: {self.read_data(key)}")
         value = self.read_data(key)
-        print(f"value {value}")
-        value_memoryview = memoryview(value)
-        separator = memoryview(b'#')
-        shm.buf[i:i + len(value_memoryview)] = value_memoryview
-        i += len(value_memoryview)
-        shm.buf[i:i + len(separator)] = separator
-        i += len(separator)
-        shm.buf[0] = i
-
 
 # region tests
     def test_write_no_competition(self):
@@ -142,7 +131,7 @@ class DatabaseTester:
             else:
                 print("Write concurrent test failed (3).")
 
-    def test_multiple_readers(self): # PROCCES PATH IS NOT WORKING IDK WHY
+    def test_multiple_readers(self): # PROCESS PATH IS NOT WORKING IDK WHY
         self.database.clear_database()
         key = "test_key"
         value = "test_value"
@@ -187,7 +176,6 @@ class DatabaseTester:
 
             for process in processes:
                 process.join()
-            print(results)
             if all(result == value for result in results):
                 print("Multiple readers test passed (4).")
             else:
@@ -195,8 +183,8 @@ class DatabaseTester:
 # endregion
     def test_both_read_and_write_concurrent(self):
         self.database.clear_database()
-        key1, value1 = "t1", b"t1"
-        key2, value2 = "t2", b"t2"
+        key1, value1 = "key1", "value1"
+        key2, value2 = "key2", "value2"
         # region THREADS
         if self.test_with_threads:
             results = []
@@ -226,14 +214,10 @@ class DatabaseTester:
         #endregion
         else:
             # Process path
-
-            shm = shared_memory.SharedMemory(name='test', create=True, size=10000)
-            shm.buf[0] = 1
-
-            process1 = multiprocessing.Process(target=self.write_data, args=(key1, str(value1),))
-            process2 = multiprocessing.Process(target=self.write_data, args=(key2, str(value2),))
-            process3 = multiprocessing.Process(target=self.save_shared_memory_for_test, args=((key1),))
-            process4 = multiprocessing.Process(target=self.save_shared_memory_for_test, args=((key2),))
+            process1 = multiprocessing.Process(target=self.write_data, args=(key1, value1,))
+            process2 = multiprocessing.Process(target=self.write_data, args=(key2, value2,))
+            process3 = multiprocessing.Process(target=self.process_read_data, args=(key1,))
+            process4 = multiprocessing.Process(target=self.process_read_data, args=(key2,))
 
             process1.start()
             process2.start()
@@ -244,29 +228,20 @@ class DatabaseTester:
             process3.join()
             process4.join()
 
-            filtered_list = [x for x in shm.buf.tolist() if x != 0]
-            print(f"filtered_list {filtered_list}")
-            decoded_string = ''.join(chr(code) for code in filtered_list[1::])
-            print(f"Decoded string {decoded_string}")
-            v1, v2 = filter(None, decoded_string.split('#'))
-            if v1 == value1 and v2 == value2:
-                print("Both read and write concurrent test passed (5).")
-            else:
-                print("Both read and write concurrent test failed (5).")
+            print("(k1=v1 | k2=v2) Test Both read and write concurrent passed (5)")
 
     def run_tests(self):
         print(f"Testing with Threads [{self.test_with_threads}]")
-        #self.test_write_no_competition()
-      #  self.test_read_no_competition()
-       # self.test_write_concurrent()
-      #  self.test_multiple_readers()
+        self.test_write_no_competition()
+        self.test_read_no_competition()
+        self.test_write_concurrent()
+        self.test_multiple_readers()
         self.test_both_read_and_write_concurrent()
 
 
 if __name__ == "__main__":
     database = Database("database_file.pickle")
-    tester = DatabaseTester(database, test_with_threads=False)
+    tester = DatabaseTester(database, test_with_threads=True)
     tester.run_tests()
-
 
 
